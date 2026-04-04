@@ -1,0 +1,15 @@
+av
+bin/
+*.exe
+*.test
+*.out
+
+# Generated reports and temporary scan output
+reports/*.json
+reports/*.txt
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
