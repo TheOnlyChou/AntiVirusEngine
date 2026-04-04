@@ -1,0 +1,36 @@
+{
+  "signatures": [
+    {
+      "id": "TEST001",
+      "name": "EICAR-Test-File",
+      "type": "hash",
+      "value": "3395856ce81f2b7382dee72602f798b642f14140",
+      "severity": "CRITICAL",
+      "category": "test"
+    },
+    {
+      "id": "TEST002",
+      "name": "Test-Malicious-MD5",
+      "type": "hash",
+      "value": "d41d8cd98f00b204e9800998ecf8427e",
+      "severity": "HIGH",
+      "category": "trojan"
+    },
+    {
+      "id": "TEST003",
+      "name": "Test-Suspicious-SHA256",
+      "type": "hash",
+      "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "severity": "MEDIUM",
+      "category": "suspicious"
+    },
+    {
+      "id": "TEST004",
+      "name": "Test-Adware-Sample",
+      "type": "hash",
+      "value": "5d41402abc4b2a76b9719d911017c592",
+      "severity": "LOW",
+      "category": "adware"
+    }
+  ]
+}
