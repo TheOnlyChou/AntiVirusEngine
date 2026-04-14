@@ -50,7 +50,7 @@ func (c *CLI) Run(args []string) error {
 }
 
 // handleScan processes the scan command.
-// Phase 1: Hash-based scanning with text/JSON output.
+// Phase 3: Hash + YARA + PE scanning with text/JSON output.
 func (c *CLI) handleScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 
@@ -60,8 +60,8 @@ func (c *CLI) handleScan(args []string) error {
 		reportOutput   = fs.String("report", "", "Path to save scan report (optional)")
 		scanHashes     = fs.Bool("hashes", true, "Enable hash-based detection")
 		scanSignatures = fs.Bool("signatures", true, "Enable signature matching")
-		scanYARA       = fs.Bool("yara", false, "Enable YARA rule scanning (Phase 3)")
-		scanPE         = fs.Bool("pe", false, "Enable PE analysis (Phase 4)")
+		scanYARA       = fs.Bool("yara", true, "Enable YARA rule scanning (Phase 2)")
+		scanPE         = fs.Bool("pe", true, "Enable PE analysis (Phase 3)")
 		scanHeuristics = fs.Bool("heuristics", false, "Enable heuristic checks (Phase 5)")
 	)
 
@@ -186,7 +186,7 @@ func (c *CLI) saveJSONReport(result *model.ScanResult, filePath string) error {
 func (c *CLI) handleVersion() error {
 	fmt.Println("AntivirusEngine v0.1.0")
 	fmt.Println("Educational antivirus engine for cybersecurity learning")
-	fmt.Println("Phase 1: Hash-based detection")
+	fmt.Println("Phase 3: Hash + YARA + PE detection")
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (c *CLI) printUsage() {
 	fmt.Fprintf(os.Stderr, `Usage: av <command> [options]
 
 Commands:
-  scan        Scan a file for malware (hash-based, Phase 1)
+	scan        Scan a file for malware (hash + YARA + PE, Phase 3)
   version     Show version information
   help        Show this help message
 
@@ -210,8 +210,8 @@ Scan Flags:
   --report <path>        Save report to JSON file
   --hashes <true|false>  Enable hash computation (default: true)
   --signatures <true|false> Enable signature matching (default: true)
-  --yara <true|false>    Enable YARA rules (Phase 3, default: false)
-  --pe <true|false>      Enable PE analysis (Phase 4, default: false)
+	--yara <true|false>    Enable YARA rules (Phase 2, default: true)
+	--pe <true|false>      Enable PE analysis (Phase 3, default: true)
   --heuristics <true|false> Enable heuristic checks (Phase 5, default: false)
 
 For more information, see README.md

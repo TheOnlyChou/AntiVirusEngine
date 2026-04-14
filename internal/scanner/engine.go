@@ -22,6 +22,7 @@ type Engine struct {
 	peAnalyzer       *pe.PEAnalyzer
 	heuristicChecker *heuristics.HeuristicChecker
 	initialized      bool
+	yaraInitErr      error
 	// TODO: Add configuration and logging
 }
 
@@ -34,11 +35,12 @@ func NewEngine() *Engine {
 		peAnalyzer:       pe.NewPEAnalyzer(),
 		heuristicChecker: heuristics.NewHeuristicChecker(),
 		initialized:      false,
+		yaraInitErr:      nil,
 	}
 }
 
 // Initialize sets up the engine (load rules, signatures, etc.).
-// Phase 1: Loads hash signatures from rules/signatures.json
+// Loads signatures and YARA rule metadata.
 func (e *Engine) Initialize() error {
 	if e.initialized {
 		return nil
@@ -50,10 +52,8 @@ func (e *Engine) Initialize() error {
 		return fmt.Errorf("failed to load signatures: %w", err)
 	}
 
-	// TODO: Phase 3 - Load YARA rules
-	// if err := e.yaraScanner.LoadRules(); err != nil {
-	//     return fmt.Errorf("failed to load YARA rules: %w", err)
-	// }
+	// YARA initialization is captured and surfaced only when YARA scanning is enabled.
+	e.yaraInitErr = e.yaraScanner.LoadRules()
 
 	e.initialized = true
 	return nil
@@ -87,28 +87,56 @@ func (e *Engine) ScanFile(filePath string, opts model.ScanOptions) (*model.ScanR
 		return nil, fmt.Errorf("failed to compute hashes: %w", err)
 	}
 
-	// Initialize detections and score
+	// Initialize detections
 	var detections []model.Detection
-	totalScore := 0.0
 
 	// Phase 1: Hash-based signature matching
 	if opts.ScanHashes && opts.ScanSignatures {
 		hashDetections := e.signatureMatcher.MatchHash(hashes.MD5, hashes.SHA1, hashes.SHA256)
 		detections = append(detections, hashDetections...)
+	}
 
-		// Calculate average score from detections
-		if len(hashDetections) > 0 {
-			scoreSum := 0.0
-			for _, det := range hashDetections {
-				scoreSum += det.Score
+	// Phase 2: YARA scanning
+	if opts.ScanYARA {
+		if e.yaraInitErr == nil {
+			yaraDetections, scanErr := e.yaraScanner.Scan(filePath)
+			if scanErr != nil {
+				return nil, fmt.Errorf("YARA scan failed: %w", scanErr)
 			}
-			totalScore = scoreSum / float64(len(hashDetections))
+			detections = append(detections, yaraDetections...)
+		} else {
+			// TODO: Add warning propagation in ScanResult to surface skipped YARA checks.
 		}
 	}
 
-	// TODO: Phase 3 - YARA scanning
-	// TODO: Phase 4 - PE analysis
+	var peMetadata map[string]interface{}
+
+	// Phase 3: PE static analysis
+	if opts.ScanPE {
+		isPE, peCheckErr := e.peAnalyzer.IsExecutable(filePath)
+		if peCheckErr != nil {
+			return nil, fmt.Errorf("PE detection failed: %w", peCheckErr)
+		}
+
+		if isPE {
+			metadata, metadataErr := e.peAnalyzer.ExtractMetadata(filePath)
+			if metadataErr != nil {
+				return nil, fmt.Errorf("PE metadata extraction failed: %w", metadataErr)
+			}
+			peMetadata = metadata
+
+			peDetections, peAnalyzeErr := e.peAnalyzer.AnalyzeFile(filePath)
+			if peAnalyzeErr != nil {
+				return nil, fmt.Errorf("PE analysis failed: %w", peAnalyzeErr)
+			}
+			detections = append(detections, peDetections...)
+		}
+	}
+
+	// TODO: Phase 4 - Deeper PE behavioral mapping and section heuristics.
 	// TODO: Phase 5 - Heuristic checks
+
+	totalScore := e.computeScore(detections)
 
 	// Compute verdict based on detections
 	verdict := e.computeVerdict(detections, totalScore)
@@ -119,6 +147,7 @@ func (e *Engine) ScanFile(filePath string, opts model.ScanOptions) (*model.ScanR
 		FileSize:     fileInfo.Size(),
 		LastModified: fileInfo.ModTime(),
 		Hashes:       hashes,
+		PEMetadata:   peMetadata,
 		Detections:   detections,
 		Verdict:      verdict,
 		TotalScore:   totalScore,
@@ -145,8 +174,25 @@ func (e *Engine) GetEngineStatistics() map[string]interface{} {
 	stats := make(map[string]interface{})
 	stats["initialized"] = e.initialized
 	stats["signatures"] = e.signatureMatcher.GetStatistics()
-	// TODO: Phase 2 - Add YARA rules statistics
+	stats["yara"] = e.yaraScanner.GetRuleStatistics()
+	if e.yaraInitErr != nil {
+		stats["yara_error"] = e.yaraInitErr.Error()
+	}
 	return stats
+}
+
+// computeScore calculates the average score across all detections.
+func (e *Engine) computeScore(detections []model.Detection) float64 {
+	if len(detections) == 0 {
+		return 0.0
+	}
+
+	scoreSum := 0.0
+	for _, det := range detections {
+		scoreSum += det.Score
+	}
+
+	return scoreSum / float64(len(detections))
 }
 
 // computeVerdict determines the verdict based on detected threats and score.

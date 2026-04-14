@@ -1,0 +1,60 @@
+{
+  "rules": [
+    {
+      "dll": "kernel32.dll",
+      "function": "WriteProcessMemory",
+      "severity": "HIGH",
+      "score": 0.65,
+      "reason": "WriteProcessMemory is frequently used for process injection"
+    },
+    {
+      "dll": "kernel32.dll",
+      "function": "VirtualAllocEx",
+      "severity": "HIGH",
+      "score": 0.60,
+      "reason": "VirtualAllocEx can allocate memory in remote processes"
+    },
+    {
+      "dll": "kernel32.dll",
+      "function": "CreateRemoteThread",
+      "severity": "HIGH",
+      "score": 0.70,
+      "reason": "CreateRemoteThread is a common process injection primitive"
+    },
+    {
+      "dll": "kernel32.dll",
+      "function": "ReadProcessMemory",
+      "severity": "MEDIUM",
+      "score": 0.40,
+      "reason": "ReadProcessMemory can indicate process introspection or tampering"
+    },
+    {
+      "dll": "wininet.dll",
+      "function": "InternetOpenUrlA",
+      "severity": "MEDIUM",
+      "score": 0.35,
+      "reason": "Network download APIs can be part of staged payload retrieval"
+    },
+    {
+      "dll": "urlmon.dll",
+      "function": "URLDownloadToFileA",
+      "severity": "MEDIUM",
+      "score": 0.40,
+      "reason": "URLDownloadToFileA is commonly used to download external payloads"
+    },
+    {
+      "dll": "advapi32.dll",
+      "function": "RegSetValueExA",
+      "severity": "LOW",
+      "score": 0.25,
+      "reason": "Registry modification can indicate persistence behavior"
+    },
+    {
+      "dll": "advapi32.dll",
+      "function": "AdjustTokenPrivileges",
+      "severity": "MEDIUM",
+      "score": 0.40,
+      "reason": "Privilege manipulation may be used for escalation"
+    }
+  ]
+}

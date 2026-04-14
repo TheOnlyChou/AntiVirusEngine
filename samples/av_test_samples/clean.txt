@@ -1,0 +1,2 @@
+Hello from AntivirusEngine.
+This is a benign sample file for clean-path testing.

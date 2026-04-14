@@ -27,17 +27,18 @@ type Detection struct {
 
 // ScanResult represents the complete result of scanning a single file.
 type ScanResult struct {
-	FilePath     string        `json:"file_path"`
-	FileName     string        `json:"file_name"`
-	FileSize     int64         `json:"file_size"`
-	LastModified time.Time     `json:"last_modified"`
-	Hashes       *FileHashes   `json:"hashes"`
-	Detections   []Detection   `json:"detections"`
-	Verdict      Verdict       `json:"verdict"`
-	TotalScore   float64       `json:"total_score"` // 0.0 to 1.0
-	ScanDuration time.Duration `json:"scan_duration"`
-	ScanTime     time.Time     `json:"scan_time"`
-	// TODO: Add metadata for PE analysis, YARA matches, heuristic scores
+	FilePath     string                 `json:"file_path"`
+	FileName     string                 `json:"file_name"`
+	FileSize     int64                  `json:"file_size"`
+	LastModified time.Time              `json:"last_modified"`
+	Hashes       *FileHashes            `json:"hashes"`
+	PEMetadata   map[string]interface{} `json:"pe_metadata,omitempty"`
+	Detections   []Detection            `json:"detections"`
+	Verdict      Verdict                `json:"verdict"`
+	TotalScore   float64                `json:"total_score"` // 0.0 to 1.0
+	ScanDuration time.Duration          `json:"scan_duration"`
+	ScanTime     time.Time              `json:"scan_time"`
+	// TODO: Add richer YARA match details and heuristic breakdown fields
 }
 
 // FileHashes represents various hash values of a file.
@@ -77,7 +78,7 @@ func DefaultScanOptions() ScanOptions {
 		ScanHashes:     true,
 		ScanSignatures: true,
 		ScanYARA:       true,
-		ScanPE:         false,
+		ScanPE:         true,
 		ScanHeuristics: true,
 		EnableDeepScan: false,
 	}
