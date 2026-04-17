@@ -50,14 +50,16 @@ type FileHashes struct {
 
 // Report represents a summary of multiple scan results.
 type Report struct {
-	ReportID        string        `json:"report_id"`
-	GeneratedAt     time.Time     `json:"generated_at"`
-	ScanResults     []ScanResult  `json:"scan_results"`
-	TotalFiles      int           `json:"total_files"`
-	CleanFiles      int           `json:"clean_files"`
-	SuspiciousFiles int           `json:"suspicious_files"`
-	MaliciousFiles  int           `json:"malicious_files"`
-	TotalDuration   time.Duration `json:"total_duration"`
+	ReportID            string        `json:"report_id"`
+	GeneratedAt         time.Time     `json:"generated_at"`
+	ScanResults         []ScanResult  `json:"scan_results"`
+	TotalFiles          int           `json:"total_files"`
+	CleanFiles          int           `json:"clean_files"`
+	SuspiciousFiles     int           `json:"suspicious_files"`
+	MaliciousFiles      int           `json:"malicious_files"`
+	FilesWithDetections int           `json:"files_with_detections"`
+	SkippedFiles        int           `json:"skipped_files"`
+	TotalDuration       time.Duration `json:"total_duration"`
 	// TODO: Add statistics and risk assessment
 }
 

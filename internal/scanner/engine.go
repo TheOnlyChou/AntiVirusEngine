@@ -133,8 +133,16 @@ func (e *Engine) ScanFile(filePath string, opts model.ScanOptions) (*model.ScanR
 		}
 	}
 
-	// TODO: Phase 4 - Deeper PE behavioral mapping and section heuristics.
-	// TODO: Phase 5 - Heuristic checks
+	// Phase 4: static heuristic analysis
+	if opts.ScanHeuristics {
+		heuristicDetections, heuristicErr := e.heuristicChecker.CheckFile(filePath, peMetadata)
+		if heuristicErr != nil {
+			return nil, fmt.Errorf("heuristic analysis failed: %w", heuristicErr)
+		}
+		detections = append(detections, heuristicDetections...)
+	}
+
+	// TODO: Add cross-engine correlation between PE imports, entropy, and string heuristics.
 
 	totalScore := e.computeScore(detections)
 
@@ -158,14 +166,114 @@ func (e *Engine) ScanFile(filePath string, opts model.ScanOptions) (*model.ScanR
 	return result, nil
 }
 
-// ScanDirectory recursively scans all files in a directory.
-// TODO: Phase 2 - Implement directory scanning with concurrent file processing.
-func (e *Engine) ScanDirectory(dirPath string, opts model.ScanOptions) (*model.Report, error) {
-	// TODO: Implement directory scan logic
-	report := &model.Report{
-		GeneratedAt: time.Now(),
-		ScanResults: []model.ScanResult{},
+// ScanDirectory scans files in a directory.
+// When recursive is true, subdirectories are scanned recursively.
+func (e *Engine) ScanDirectory(dirPath string, opts model.ScanOptions, recursive bool) (*model.Report, error) {
+	start := time.Now()
+
+	if !e.initialized {
+		if err := e.Initialize(); err != nil {
+			return nil, err
+		}
 	}
+
+	rootInfo, err := os.Stat(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat directory: %w", err)
+	}
+	if !rootInfo.IsDir() {
+		return nil, fmt.Errorf("path is not a directory")
+	}
+
+	report := &model.Report{
+		ReportID:      fmt.Sprintf("scan-%d", start.UnixNano()),
+		GeneratedAt:   start,
+		ScanResults:   make([]model.ScanResult, 0),
+		TotalDuration: 0,
+	}
+
+	scanOne := func(path string) {
+		result, scanErr := e.ScanFile(path, opts)
+		if scanErr != nil {
+			// Graceful handling for file-level failures (permissions, parse errors, etc.)
+			report.SkippedFiles++
+			return
+		}
+
+		report.ScanResults = append(report.ScanResults, *result)
+		report.TotalFiles++
+
+		if len(result.Detections) > 0 {
+			report.FilesWithDetections++
+		}
+
+		switch result.Verdict {
+		case model.VerdictClean:
+			report.CleanFiles++
+		case model.VerdictSuspicious:
+			report.SuspiciousFiles++
+		case model.VerdictMalicious:
+			report.MaliciousFiles++
+		default:
+			// Unknown verdict counts toward files scanned but not categorized.
+		}
+	}
+
+	if recursive {
+		walkErr := filepath.WalkDir(dirPath, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				if os.IsPermission(walkErr) {
+					report.SkippedFiles++
+					return nil
+				}
+				report.SkippedFiles++
+				return nil
+			}
+
+			if d.IsDir() {
+				return nil
+			}
+
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				report.SkippedFiles++
+				return nil
+			}
+			if !info.Mode().IsRegular() {
+				return nil
+			}
+
+			scanOne(path)
+			return nil
+		})
+		if walkErr != nil {
+			return nil, fmt.Errorf("failed to walk directory: %w", walkErr)
+		}
+	} else {
+		entries, readErr := os.ReadDir(dirPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read directory: %w", readErr)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			info, infoErr := entry.Info()
+			if infoErr != nil {
+				report.SkippedFiles++
+				continue
+			}
+			if !info.Mode().IsRegular() {
+				continue
+			}
+
+			scanOne(filepath.Join(dirPath, entry.Name()))
+		}
+	}
+
+	report.TotalDuration = time.Since(start)
 	return report, nil
 }
 
@@ -196,7 +304,6 @@ func (e *Engine) computeScore(detections []model.Detection) float64 {
 }
 
 // computeVerdict determines the verdict based on detected threats and score.
-// Phase 1 implementation: Simple threshold-based approach
 func (e *Engine) computeVerdict(detections []model.Detection, totalScore float64) model.Verdict {
 	// No detections = clean
 	if len(detections) == 0 {

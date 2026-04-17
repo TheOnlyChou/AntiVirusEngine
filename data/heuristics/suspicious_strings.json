@@ -1,0 +1,68 @@
+{
+  "patterns": [
+    {
+      "name": "PowerShell Encoded Command",
+      "pattern": "powershell -enc",
+      "match_type": "contains",
+      "severity": "MEDIUM",
+      "score": 0.35,
+      "description": "Encoded PowerShell execution pattern detected"
+    },
+    {
+      "name": "Command Shell Execution",
+      "pattern": "cmd.exe /c",
+      "match_type": "contains",
+      "severity": "LOW",
+      "score": 0.22,
+      "description": "Command shell one-shot execution pattern detected"
+    },
+    {
+      "name": "rundll32 Execution",
+      "pattern": "rundll32",
+      "match_type": "contains",
+      "severity": "MEDIUM",
+      "score": 0.30,
+      "description": "rundll32 invocation often used for LOLBAS-style execution"
+    },
+    {
+      "name": "Registry Persistence Command",
+      "pattern": "reg add",
+      "match_type": "contains",
+      "severity": "MEDIUM",
+      "score": 0.30,
+      "description": "Registry write command that may indicate persistence"
+    },
+    {
+      "name": "Scheduled Task Creation",
+      "pattern": "schtasks",
+      "match_type": "contains",
+      "severity": "MEDIUM",
+      "score": 0.30,
+      "description": "Scheduled task tooling potentially used for persistence"
+    },
+    {
+      "name": "AppData Persistence Path",
+      "pattern": "\\appdata\\",
+      "match_type": "contains",
+      "severity": "LOW",
+      "score": 0.20,
+      "description": "AppData path reference found"
+    },
+    {
+      "name": "Startup Folder Path",
+      "pattern": "\\startup\\",
+      "match_type": "contains",
+      "severity": "MEDIUM",
+      "score": 0.28,
+      "description": "Startup folder reference may indicate persistence"
+    },
+    {
+      "name": "Temp Directory Staging Path",
+      "pattern": "\\temp\\",
+      "match_type": "contains",
+      "severity": "LOW",
+      "score": 0.18,
+      "description": "Temp path reference may indicate staged payload behavior"
+    }
+  ]
+}
