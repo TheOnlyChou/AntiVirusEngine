@@ -70,6 +70,7 @@ type ScanOptions struct {
 	ScanYARA       bool
 	ScanPE         bool
 	ScanHeuristics bool
+	Workers        int
 	EnableDeepScan bool
 	// TODO: Add more options as the engine develops
 }
@@ -82,6 +83,7 @@ func DefaultScanOptions() ScanOptions {
 		ScanYARA:       true,
 		ScanPE:         true,
 		ScanHeuristics: true,
+		Workers:        4,
 		EnableDeepScan: false,
 	}
 }

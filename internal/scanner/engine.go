@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/theonlychou/antivirusengine/internal/hashing"
@@ -185,48 +187,90 @@ func (e *Engine) ScanDirectory(dirPath string, opts model.ScanOptions, recursive
 		return nil, fmt.Errorf("path is not a directory")
 	}
 
+	targetFiles, skippedDuringDiscovery, collectErr := collectTargetFiles(dirPath, recursive)
+	if collectErr != nil {
+		return nil, collectErr
+	}
+
 	report := &model.Report{
 		ReportID:      fmt.Sprintf("scan-%d", start.UnixNano()),
 		GeneratedAt:   start,
 		ScanResults:   make([]model.ScanResult, 0),
+		SkippedFiles:  skippedDuringDiscovery,
 		TotalDuration: 0,
 	}
 
-	scanOne := func(path string) {
-		result, scanErr := e.ScanFile(path, opts)
-		if scanErr != nil {
-			// Graceful handling for file-level failures (permissions, parse errors, etc.)
+	workers := opts.Workers
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(targetFiles) && len(targetFiles) > 0 {
+		workers = len(targetFiles)
+	}
+
+	jobs := make(chan scanJob)
+	outcomes := make(chan scanOutcome)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				result, scanErr := e.ScanFile(job.path, opts)
+				outcomes <- scanOutcome{path: job.path, result: result, err: scanErr}
+			}
+		}()
+	}
+
+	go func() {
+		for _, path := range targetFiles {
+			jobs <- scanJob{path: path}
+		}
+		close(jobs)
+		wg.Wait()
+		close(outcomes)
+	}()
+
+	for out := range outcomes {
+		if out.err != nil {
 			report.SkippedFiles++
-			return
+			continue
 		}
 
-		report.ScanResults = append(report.ScanResults, *result)
+		report.ScanResults = append(report.ScanResults, *out.result)
 		report.TotalFiles++
 
-		if len(result.Detections) > 0 {
+		if len(out.result.Detections) > 0 {
 			report.FilesWithDetections++
 		}
 
-		switch result.Verdict {
+		switch out.result.Verdict {
 		case model.VerdictClean:
 			report.CleanFiles++
 		case model.VerdictSuspicious:
 			report.SuspiciousFiles++
 		case model.VerdictMalicious:
 			report.MaliciousFiles++
-		default:
-			// Unknown verdict counts toward files scanned but not categorized.
 		}
 	}
+
+	sort.Slice(report.ScanResults, func(i, j int) bool {
+		return report.ScanResults[i].FilePath < report.ScanResults[j].FilePath
+	})
+
+	report.TotalDuration = time.Since(start)
+	return report, nil
+}
+
+func collectTargetFiles(dirPath string, recursive bool) ([]string, int, error) {
+	targetFiles := make([]string, 0)
+	skipped := 0
 
 	if recursive {
 		walkErr := filepath.WalkDir(dirPath, func(path string, d os.DirEntry, walkErr error) error {
 			if walkErr != nil {
-				if os.IsPermission(walkErr) {
-					report.SkippedFiles++
-					return nil
-				}
-				report.SkippedFiles++
+				skipped++
 				return nil
 			}
 
@@ -236,45 +280,45 @@ func (e *Engine) ScanDirectory(dirPath string, opts model.ScanOptions, recursive
 
 			info, infoErr := d.Info()
 			if infoErr != nil {
-				report.SkippedFiles++
+				skipped++
 				return nil
 			}
 			if !info.Mode().IsRegular() {
 				return nil
 			}
 
-			scanOne(path)
+			targetFiles = append(targetFiles, path)
 			return nil
 		})
 		if walkErr != nil {
-			return nil, fmt.Errorf("failed to walk directory: %w", walkErr)
+			return nil, skipped, fmt.Errorf("failed to walk directory: %w", walkErr)
 		}
-	} else {
-		entries, readErr := os.ReadDir(dirPath)
-		if readErr != nil {
-			return nil, fmt.Errorf("failed to read directory: %w", readErr)
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-
-			info, infoErr := entry.Info()
-			if infoErr != nil {
-				report.SkippedFiles++
-				continue
-			}
-			if !info.Mode().IsRegular() {
-				continue
-			}
-
-			scanOne(filepath.Join(dirPath, entry.Name()))
-		}
+		return targetFiles, skipped, nil
 	}
 
-	report.TotalDuration = time.Since(start)
-	return report, nil
+	entries, readErr := os.ReadDir(dirPath)
+	if readErr != nil {
+		return nil, skipped, fmt.Errorf("failed to read directory: %w", readErr)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			skipped++
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+
+		targetFiles = append(targetFiles, filepath.Join(dirPath, entry.Name()))
+	}
+
+	return targetFiles, skipped, nil
 }
 
 // GetEngineStatistics returns information about the scanning engine state.

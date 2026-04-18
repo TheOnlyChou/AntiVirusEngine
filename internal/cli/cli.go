@@ -57,6 +57,7 @@ func (c *CLI) handleScan(args []string) error {
 	var (
 		filePath       = fs.String("file", "", "Path to file or directory to scan")
 		recursive      = fs.Bool("recursive", true, "Recursively scan subdirectories when target is a directory")
+		workers        = fs.Int("workers", 4, "Number of worker goroutines for directory scans")
 		outputFormat   = fs.String("format", "text", "Output format: text, json")
 		reportOutput   = fs.String("report", "", "Path to save scan report (optional)")
 		scanHashes     = fs.Bool("hashes", true, "Enable hash-based detection")
@@ -82,6 +83,7 @@ func (c *CLI) handleScan(args []string) error {
 		ScanYARA:       *scanYARA,
 		ScanPE:         *scanPE,
 		ScanHeuristics: *scanHeuristics,
+		Workers:        *workers,
 	}
 
 	pathInfo, err := os.Stat(*filePath)
@@ -276,6 +278,7 @@ Examples:
 Scan Flags:
   --file <path>          Path to file to scan (required)
 	--recursive <true|false> Recursively scan subdirectories when scanning directories (default: true)
+	--workers <int>         Worker goroutines for directory scans (default: 4)
   --format <text|json>   Output format: text (default) or json
   --report <path>        Save report to JSON file
   --hashes <true|false>  Enable hash computation (default: true)
